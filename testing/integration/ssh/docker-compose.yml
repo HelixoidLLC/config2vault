@@ -1,0 +1,21 @@
+vault:
+  image: sjourdan/vault
+  cap_add:
+    - IPC_LOCK
+  ports:
+    - 8200:8200
+  volumes:
+    - ./ssl:/vault/ssl
+    - ./vault/vault.hcl:/vault/config/vault.hcl
+  command: "server -log-level=trace -config=/vault/config/vault.hcl"
+
+sshd:
+  build: ssh_container
+  privileged: true
+  ports:
+    - "8222:22"
+  links:
+    - "vault:vault"
+  volumes:
+    - ./ssh_container_config/vault-ssh-helper_config.hcl:/etc/vault-ssh-helper/config.hcl
+    - ./ssl/ca.crt:/etc/vault-ssh-helper/ca.crt

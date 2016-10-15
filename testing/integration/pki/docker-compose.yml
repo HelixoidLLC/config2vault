@@ -1,0 +1,9 @@
+vault:
+  image: sjourdan/vault
+  cap_add:
+    - IPC_LOCK
+  ports:
+    - 8200:8200
+  volumes:
+    - ./vault/vault.hcl:/vault/config/vault.hcl
+  command: "server -log-level=trace -config=/vault/config/vault.hcl"

@@ -1,0 +1,52 @@
+{
+  "datacenter": "dc1",
+  "data_dir": "/consul/data",
+  "log_level": "INFO",
+  "server": true,
+  "addresses": {
+    "rpc": "0.0.0.0",
+    "http": "0.0.0.0",
+    "https": "0.0.0.0",
+    "dns": "0.0.0.0"
+  },
+  "ports": {
+    "server": 8300,
+    "serf_lan": 8301,
+    "serf_wan": 8302,
+    "rpc": 8400,
+    "http": 8500,
+    "https": 8501,
+    "dns": 8600
+  },
+  "client_addr": "0.0.0.0",
+  "ui": true,
+  "skip_leave_on_interrupt": true,
+  "enable_syslog": false,
+  "disable_remote_exec": true,
+  "acl_datacenter": "dc1",
+  "acl_master_token": "a49e7360-f150-463a-9a29-3eb186ffae1a",
+  "acl_down_policy": "extend-cache",
+  "acl_default_policy": "deny",
+
+  "encrypt": "mMk0HOP2JRIVoB983ok4Jw==",
+  "verify_incoming": false,
+  "verify_outgoing": false,
+  "verify_server_hostname": false,
+
+  "leave_on_terminate": true,
+  "rejoin_after_leave": true,
+
+  "domain": "consul",
+  "disable_update_check": true,
+
+  "http_api_response_headers": {
+    "Access-Control-Allow-Origin": "*"
+  },
+
+  "dns_config": {
+    "allow_stale": true,
+    "max_stale": "50s",
+    "node_ttl": "0s",
+    "only_passing": true
+  }
+}

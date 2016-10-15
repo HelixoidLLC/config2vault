@@ -1,0 +1,26 @@
+consul:
+  image: consul:v0.6.4
+  volumes:
+    - ./consul/config.json:/consul/config.json
+  ports:
+    - 8300:8300     # Server RPC, Server Use Only
+    - 8301:8301/tcp # Serf Gossip Protocol for LAN
+    - 8301:8301/udp # Serf Gossip Protocol for LAN
+    - 8400:8400     # CLI RPC
+    - 8500:8500     # HTTP API & Web UI
+    - 8501:8501     # HTTPS API & Web UI
+    - 53:8600/tcp   # DNS Interface
+    - 53:8600/udp   # DNS Interface
+  command: "agent -server -config-file=/consul/config.json -node consul -bootstrap-expect 1 -bind 0.0.0.0 -client 0.0.0.0"
+
+vault:
+  image: sjourdan/vault
+  cap_add:
+    - IPC_LOCK
+  ports:
+    - 8200:8200
+  volumes:
+    - ./vault/vault.hcl:/vault/config/vault.hcl
+  links:
+    - "consul:consul00.consul"
+  command: "server -log-level=trace -config=/vault/config/vault.hcl"

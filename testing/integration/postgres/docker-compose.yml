@@ -1,0 +1,19 @@
+postgres:
+  image: postgres:9.4
+  ports:
+    - 5432:5432
+  environment:
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: password
+
+vault:
+  image: sjourdan/vault
+  cap_add:
+    - IPC_LOCK
+  ports:
+    - 8200:8200
+  volumes:
+    - ./vault/vault.hcl:/vault/config/vault.hcl
+  links:
+    - "postgres:postgres"
+  command: "server -log-level=trace -config=/vault/config/vault.hcl"
