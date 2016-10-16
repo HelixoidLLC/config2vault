@@ -3,6 +3,10 @@
   _config2vault_ is the foundation of the "Immutable Security" and an extention of the "Immutable Infrastructure".
 It is used to "seed" Vault with the configuration from sources like source control and ensure that there are no
 deviations from such configuration.
+
+**Important to understand** the fact that _config2vault_ converges all the rules. This means that it'll ensure that
+the state of Vault is exactly matching to the rules. If the configuration is not present in Vault, it'll be created
+and if the configuration is present in Vault but not in the rules, it'll be removed and a WARNING will be raised.
  
   The deviations that are hapenning in the configuration are either the natural lifecycle of the system
 (ex: deprecation of a policy) or an indentification of a **security breach** (ex: unexpected token created).
@@ -51,21 +55,174 @@ Ex: Config file example
  * cert_file - path to Vault client certificate
  * key_file - path to Vault client key
 
- # Developing config2vault
- ## Prerequisits for development environment
+## Configuring Secret Backends
+
+### Consul Secret Backend
+
+Example for configuring [Consul Secret Backend](https://www.vaultproject.io/docs/secrets/consul/index.html):
+
+```
+mounts:
+  - type: consul
+    description: Consul backend
+    policy_base64_encode: true
+    config:
+      - path: access
+        properties:
+          address: 192.168.99.100:8500
+          token: a49e7360-f150-463a-9a29-3eb186ffae1a
+          
+roles:
+  - name: readonly
+    path: consul
+    properties:
+      policy: |
+        key "" {
+          policy = "read"
+        }
+```
+
+### Generic Secret Backend
+
+Example for configuring [Generic Secret Backend](https://www.vaultproject.io/docs/secrets/generic/index.html):
+
+```
+secrets:
+  - path: deploy/secret
+    fields:
+      - key: pass
+        value: hello
+```
+
+### PKI Secret Backend
+
+Example for configuring [PKI Secret Backend](https://www.vaultproject.io/docs/secrets/pki/index.html):
+
+```
+mounts:
+  - type: pki
+    max_lease_ttl: 87600h
+    config:
+      - path: ca
+        ca_bundle:
+          key: "@ssl/ca.key"
+          cert: "@ssl/ca.crt"
+          
+roles:
+  - name: example-dot-com
+    path: pki
+    properties:
+      allowed_domains: example.com
+      allow_subdomains: true
+      max_ttl: 72h
+```
+
+### PostgreSQL Secret Backend
+
+Example for configuring [PostgreSQL Secret Backend](https://www.vaultproject.io/docs/secrets/postgresql/index.html):
+
+```
+mounts:
+  - type: postgresql
+    description: Postgres backend
+    path: myPostgres
+    config:
+      - path: connection
+        properties:
+          connection_url: postgresql://postgres:password@192.168.99.100:5432/postgres?sslmode=disable
+      - path: lease
+        properties:
+          lease: 1h
+          lease_max: 24h
+          
+roles:
+  - name: readonly
+    path: myPostgres
+    properties:
+      sql: |
+        CREATE ROLE "{{name}}" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
+        GRANT SELECT ON ALL TABLES IN SCHEMA public TO "{{name}}";
+```
+
+### SSH Secret Backend
+
+Example for configuring [SSH Secret Backend](https://www.vaultproject.io/docs/secrets/ssh/index.html):
+
+```
+mounts:
+  - type: ssh
+  
+roles:
+  - name: otp_key_role
+    path: ssh
+    properties:
+      key_type: otp
+      default_user: admin
+      cidr_list: 10.135.0.0/16
+      cidr_list: 192.168.99.0/24
+```
+
+## Configuring Audit Backend
  
- * Go
- * Docker maching and Docker-compose configured
- * make
- 
- ## Building release bits
- 
- ```
- make build
- ```
- 
- ## Running Integation test suite
- 
- ```
- make integration
- ```
+### AppRole Auth Backend
+
+Example for configuring [AppRole Auth Backend](https://www.vaultproject.io/docs/auth/approle.html):
+
+```
+auth:
+  - type: approle
+  
+approles:
+  - role: role1
+    policies:
+      - pol1
+      - pol2
+    secret_id_ttl: 10m
+    token_ttl: 20m
+    token_max_ttl: 30m
+    secret_id_num_uses :40
+```
+
+### Username & Password Auth Backend 
+
+Example for configuring [Username & Password Auth Backend](https://www.vaultproject.io/docs/auth/userpass.html):
+
+```
+auth:
+  - type: userpass
+  
+policies:
+  - name: secret
+    rules: |
+      path "secret/*" {
+        capabilities = ["create", "read", "update", "delete", "list"]
+      }
+      path "secret/super-secret" {
+        capabilities = ["deny"]
+      }
+      
+users:
+  - name: john
+    password: secret
+    policies:
+      - secret
+```
+
+# Developing config2vault
+## Prerequisits for development environment
+
+* Go
+* Docker maching and Docker-compose configured
+* make
+
+## Building release bits
+
+```
+make build
+```
+
+## Running Integation test suite
+
+```
+make integration
+```
