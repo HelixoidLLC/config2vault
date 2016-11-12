@@ -26,7 +26,7 @@ import (
 )
 
 func TestInjestSshOtpBackend(t *testing.T) {
-	//t.Skip("skipping test for now.")
+	t.Skip("skipping test for now.")
 
 	log.SetLevel(log.ErrorLevel)
 

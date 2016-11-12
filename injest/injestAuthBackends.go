@@ -19,6 +19,7 @@ package injest
 import (
 	"config2vault/log"
 	"errors"
+	"fmt"
 )
 
 func (vault *vaultClient) UpdateAuthBackends(authMounts *[]authBackendInfo) error {
@@ -40,13 +41,23 @@ func (vault *vaultClient) UpdateAuthBackends(authMounts *[]authBackendInfo) erro
 		}
 
 		if _, ok := (*currentAuthMounts)[authBackend.Path]; ok {
+
+			// TODO: optimise this
+			// Reconverge config for the existing mounts
+			if err := vault.ConfigureAuthBackend(&authBackend); err != nil {
+				return err
+			}
+
 			// Similar mount is present in the system
 			log.Info("Skipping Auth mount: " + authBackend.Type)
 			continue
 		}
 
-		err := vault.EnableAuthBackend(&authBackend)
-		if err != nil {
+		if err := vault.EnableAuthBackend(&authBackend); err != nil {
+			return err
+		}
+
+		if err := vault.ConfigureAuthBackend(&authBackend); err != nil {
 			return err
 		}
 	}
@@ -85,5 +96,29 @@ func (vault *vaultClient) EnableAuthBackend(authBackend *authBackendInfo) error 
 		return errors.New("Failed to create a new mount")
 	}
 
+	return nil
+}
+
+func (vault *vaultClient) ConfigureAuthBackend(authBackend *authBackendInfo) error {
+	log.Infof("Configuring '%s' auth backend", authBackend.Path)
+	// TODO: read existing config, compare and apply only if not equal
+	for _, props := range authBackend.Config {
+		path, ok := props["path"]
+		if !ok {
+			path = "config"
+		}
+		properties := getStringMapInterfaceFromMap(&props, "properties", nil)
+		if properties == nil {
+			log.Fatalf("Configuration section '%s' present but no properties can be found", authBackend.Path)
+			return errors.New("Can't have auth config section without properties")
+		}
+
+		configPath := fmt.Sprintf("auth/%s/%s", authBackend.Path, path)
+		log.Debugf("Writing auth backend '%s' properties to path: %s", authBackend.Path, configPath)
+		if _, err := vault.Client.Logical().Write(configPath, *properties); err != nil {
+			log.Errorf("Failed to write properties to path '%s': %v", configPath, err)
+			return errors.New("Failed to configure Auth Backend: " + authBackend.Path)
+		}
+	}
 	return nil
 }

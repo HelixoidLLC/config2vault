@@ -26,7 +26,7 @@ import (
 
 // Config represents the configuration information.
 type Config struct {
-	Path  string `json:"path,omitempty"`
+	Rules string `json:"rules,omitempty"`
 	Url   string `json:"url,omitempty"`
 	Token string `json:"token,omitempty"`
 

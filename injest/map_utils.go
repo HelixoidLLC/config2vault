@@ -117,6 +117,41 @@ func getBoolFromMap(m *map[string]interface{}, key string, defaultValue bool) (r
 	return result
 }
 
+func getStringMapInterfaceFromMap(m *map[string]interface{}, key string, defaultValue *map[string]interface{}) (*map[string]interface{}) {
+	if m == nil {
+		return defaultValue
+	}
+	value, ok := (*m)[key]
+	if !ok {
+		return defaultValue
+	}
+	var result map[string]interface{}
+	switch value.(type) {
+	case map[interface{}]interface{}:
+		result = make(map[string]interface{})
+		interface_map, ok := value.(map[interface{}]interface{})
+		if !ok {
+			log.Errorf("Failed to convert '%s' value '%v' of type %s to map[interface{}]interface{}", key, value, reflect.TypeOf(value))
+			return defaultValue
+		}
+		for k, v := range interface_map {
+			key, ok := k.(string)
+			if !ok {
+				log.Errorf("Failed to convert '%s' value '%v' of type %s to string", key, k, reflect.TypeOf(k))
+				return defaultValue
+			}
+			result[key] = v
+		}
+	case map[string]interface{}:
+		log.Debug("nothing")
+		result = make(map[string]interface{})
+	default:
+		log.Errorf("Failed to convert '%s' value '%v' of type %s to map[interface{}]interface{}", key, value, reflect.TypeOf(value))
+		return defaultValue
+	}
+	return &result
+}
+
 func stringArrayToStringMap(in *[]string) *map[string]interface{} {
 	out := make(map[string]interface{})
 	for _, s := range *in {

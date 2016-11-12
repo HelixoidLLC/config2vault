@@ -43,6 +43,7 @@ func TestInjestGenericSecrets(t *testing.T) {
 	}
 
 	Convey("Generic Backend", t, func() {
+		Convey("Remove all secrets if section is present and empty", nil)
 		Convey("Secret is stored", func() {
 			secretPath := "test/foo"
 			policies := vaultConfig{

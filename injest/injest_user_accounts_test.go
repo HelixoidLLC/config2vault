@@ -41,6 +41,7 @@ func TestInjestUserAccounts(t *testing.T) {
 	}
 
 	Convey("Injest user accounts", t, func() {
+		Convey("Remove all users section is present and empty", nil)
 		Convey("Ask for Auth users to be mounted", func() {
 			userName := "test"
 

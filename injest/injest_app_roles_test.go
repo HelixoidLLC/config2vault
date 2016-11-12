@@ -43,6 +43,7 @@ func TestInjestAuthAppidBackend(t *testing.T) {
 	}
 
 	Convey("Enable AppID Auth backend", t, func() {
+		Convey("Remove all approles if section is present and empty", nil)
 		Convey("Role is created", func() {
 			mountType := "approle"
 			mountPath := "approle"

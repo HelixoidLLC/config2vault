@@ -43,6 +43,7 @@ func TestInjestPolicies(t *testing.T) {
 	}
 
 	Convey("Injest policies", t, func() {
+		Convey("Remove all policies if section is present and empty", nil)
 		Convey("A policy is modified if differs", func() {
 
 			originalSecretPolicies := `path "secret/*" { policy = "write" }`

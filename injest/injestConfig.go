@@ -50,6 +50,9 @@ type mountInfo struct {
 	Config             []map[string]interface{} `yaml:"config,omitempty"`
 }
 
+type propertyBag map[string]interface{}
+type propertyBagArray []propertyBag
+
 type authBackendInfo struct {
 	Type        string                   `yaml:"type"`
 	Description string                   `yaml:"description,omitempty"`
@@ -369,7 +372,23 @@ func Reconnect() (*vaultClient, error) {
 	// VAULT_CLIENT_KEY
 	// VAULT_SKIP_VERIFY
 
-	_vaultClient, err := createClient(address, config.Conf.CaFile, config.Conf.CertFile, config.Conf.KeyFile)
+	ca_file_path, err := filepath.Abs(config.Conf.CaFile)
+	if err != nil {
+		log.Fatal(err)
+		return nil, errors.New("Can't locate CA file")
+	}
+	vault_cert_path, err := filepath.Abs(config.Conf.CertFile)
+	if err != nil {
+		log.Fatal(err)
+		return nil, errors.New("Can't locate Vault Cert file")
+	}
+	vault_key_path, err := filepath.Abs(config.Conf.KeyFile)
+	if err != nil {
+		log.Fatal(err)
+		return nil, errors.New("Can't locate Vault Key file")
+	}
+
+	_vaultClient, err := createClient(address, ca_file_path, vault_cert_path, vault_key_path)
 	if err == nil {
 		vault.Client = _vaultClient
 	} else {
