@@ -162,6 +162,20 @@ roles:
       cidr_list: 192.168.99.0/24
 ```
 
+### Transit encryption
+
+Example for configuring [Transit Backend](https://www.vaultproject.io/docs/secrets/transit/index.html):
+
+```
+mounts:
+  - type: transit
+  
+transit_keys:
+  - name: foo
+    type: aes256-gcm96
+
+```
+
 ## Configuring Audit Backend
  
 ### AppRole Auth Backend

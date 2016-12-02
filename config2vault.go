@@ -26,7 +26,7 @@ import (
 	"runtime"
 )
 
-const version = "0.0.8"
+const version = "0.0.9"
 
 var versionFlag bool
 

@@ -144,5 +144,6 @@ func TestInjestMounts(t *testing.T) {
 			So(ok, ShouldBeTrue)
 
 		})
+		Convey("Mount is removed if not anymore on the list", nil)
 	})
 }

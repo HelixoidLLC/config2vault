@@ -63,7 +63,7 @@ func TestInjestSshOtpBackend(t *testing.T) {
 						Properties: map[string]string{
 							"key_type":     "otp",
 							"default_user": "admin",
-							"cidr_list": "172.17.0.5/32",
+							"cidr_list":    "172.17.0.5/32",
 						},
 					},
 				},

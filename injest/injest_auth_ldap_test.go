@@ -51,13 +51,13 @@ func TestInjestAuthLdap(t *testing.T) {
 						Config: []map[string]interface{}{
 							map[string]interface{}{
 								"properties": map[string]interface{}{
-									"url": "ldaps://ldap.example.com",
-									"userattr": "uid",
-									"userdn": "ou=Users,dc=example,dc=com",
-									"discoverdn": "true",
-									"groupdn": "ou=Groups,dc=example,dc=com",
+									"url":          "ldaps://ldap.example.com",
+									"userattr":     "uid",
+									"userdn":       "ou=Users,dc=example,dc=com",
+									"discoverdn":   "true",
+									"groupdn":      "ou=Groups,dc=example,dc=com",
 									"insecure_tls": "false",
-									"starttls": "true",
+									"starttls":     "true",
 								},
 							},
 							map[string]interface{}{

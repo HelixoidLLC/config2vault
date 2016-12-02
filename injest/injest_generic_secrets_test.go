@@ -43,7 +43,6 @@ func TestInjestGenericSecrets(t *testing.T) {
 	}
 
 	Convey("Generic Backend", t, func() {
-		Convey("Remove all secrets if section is present and empty", nil)
 		Convey("Secret is stored", func() {
 			secretPath := "test/foo"
 			policies := vaultConfig{
@@ -70,6 +69,39 @@ func TestInjestGenericSecrets(t *testing.T) {
 
 			So(getStringFromMap(&secret.Data, "zip", ""), ShouldEqual, "zap")
 		})
+		Convey("Secret with multiple fields is stored", func() {
+			secretPath := "test/foo"
+			policies := vaultConfig{
+				Secrets: []genericSecret{
+					genericSecret{
+						Path: secretPath,
+						Fields: []fieldPair{
+							fieldPair{
+								Key:   "zip",
+								Value: "zap",
+							},
+							fieldPair{
+								Key:   "bar",
+								Value: "clap",
+							},
+						},
+					},
+				},
+			}
+			err := injestConfig(vault, &policies)
+			So(err, ShouldBeEmpty)
+
+			secret, err := vault.Client.Logical().Read("/secret/" + secretPath)
+			if err != nil {
+				t.Fatalf("Failed to read secret. %#v", err)
+			}
+			So(secret, ShouldNotBeNil)
+			log.Infof("Got secret: %v", *secret)
+
+			So(getStringFromMap(&secret.Data, "zip", ""), ShouldEqual, "zap")
+			So(getStringFromMap(&secret.Data, "bar", ""), ShouldEqual, "clap")
+		})
+		Convey("Remove all secrets if section is present and empty", nil) // See the "Secret is removed if not on the list" test
 		Convey("Secret is removed if not on the list", func() {
 			secretPath := "test/bar"
 			policies := vaultConfig{

@@ -35,9 +35,8 @@ import (
 )
 
 type vaultClient struct {
-	Token   string
-	Client  *vaultapi.Client
-	Config1 *vaultapi.Config
+	Token  string
+	Client *vaultapi.Client
 }
 
 type mountInfo struct {
@@ -101,6 +100,13 @@ type genericSecret struct {
 	Fields []fieldPair `yaml:"fields"`
 }
 
+type transitKey struct {
+	Type string `yaml:"type"`
+	Name string `yaml:"name"`
+	// derived
+	// convergent_encryption
+}
+
 type vaultConfig struct {
 	Mounts       []mountInfo         `yaml:"mounts,omitempty"`
 	AuthBackends []authBackendInfo   `yaml:"auth,omitempty"`
@@ -109,6 +115,7 @@ type vaultConfig struct {
 	Policies     []policyDefiniton   `yaml:"policies,omitempty"`
 	AppRoles     []appRoleProperties `yaml:"approles,omitempty"`
 	Secrets      []genericSecret     `yaml:"secrets,omitempty"`
+	TransitKeys  []transitKey        `yaml:"transit_keys,omitempty"`
 }
 
 func InjestConfig(config *vaultConfig) error {
@@ -237,6 +244,11 @@ func injestConfig(vault *vaultClient, conf *vaultConfig) error {
 	// ### Generic Secrets
 	if vault.UpdateGenericSecrets(&conf.Secrets) != nil {
 		return errors.New("Failed to update Generic Secrets")
+	}
+
+	// ### Transit Keys
+	if vault.UpdateTransitKeys(&conf.TransitKeys) != nil {
+		return errors.New("Failed to update Transit Keys")
 	}
 
 	return nil

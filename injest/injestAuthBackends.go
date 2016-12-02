@@ -27,18 +27,24 @@ func (vault *vaultClient) UpdateAuthBackends(authMounts *[]authBackendInfo) erro
 	if err != nil {
 		return err
 	}
-	for k, _ := range *currentAuthMounts {
-		log.Debugf("Found '%s' Auth backend", k)
+	current_auth_mounts := make(map[string]interface{}, len(*currentAuthMounts))
+	for path, _ := range *currentAuthMounts {
+		log.Debugf("Found '%s' Auth backend", path)
+		current_auth_mounts[path] = nil
+	}
+	ignoreBackends := map[string]bool{
+		"token": true,
 	}
 
 	for authMountID, authBackend := range *authMounts {
-		log.Debugf("Mounting %s auth backend", authBackend.Path)
 
 		// Defaulting empty path to the Type of the mount
 		if authBackend.Path == "" {
 			authBackend.Path = authBackend.Type
 			(*authMounts)[authMountID].Path = authBackend.Path
 		}
+
+		log.Debugf("Mounting '%s' auth backend", authBackend.Path)
 
 		if _, ok := (*currentAuthMounts)[authBackend.Path]; ok {
 
@@ -49,15 +55,30 @@ func (vault *vaultClient) UpdateAuthBackends(authMounts *[]authBackendInfo) erro
 			}
 
 			// Similar mount is present in the system
-			log.Info("Skipping Auth mount: " + authBackend.Type)
+			log.Infof("Skipping '%s' auth mount", authBackend.Type)
+			delete(current_auth_mounts, authBackend.Path)
+
+			// TODO: reapply configuration
 			continue
 		}
+
+		log.Debug("Here  ####")
 
 		if err := vault.EnableAuthBackend(&authBackend); err != nil {
 			return err
 		}
 
 		if err := vault.ConfigureAuthBackend(&authBackend); err != nil {
+			return err
+		}
+	}
+
+	for path, _ := range current_auth_mounts {
+		if ignoreBackends[path] {
+			continue
+		}
+		log.Debugf("Disabling runaway auth mount: %s", path)
+		if err := vault.DisableAuthBackend(path); err != nil {
 			return err
 		}
 	}
@@ -92,8 +113,19 @@ func (vault *vaultClient) EnableAuthBackend(authBackend *authBackendInfo) error 
 	log.Infof("Adding new auth backend of type '%s' at path '%s'.", authBackend.Type, authBackend.Path)
 	// TODO: validate if there is a duplicate path in the sytem
 	if err := vault.Client.Sys().EnableAuth(authBackend.Path, authBackend.Type, authBackend.Description); err != nil {
-		log.Errorf("Failed to create a new Auth mount. %v", err)
-		return errors.New("Failed to create a new mount")
+		log.Errorf("Failed to mount a new Auth backend. %v", err)
+		return errors.New("Failed to mount a new Auth backend")
+	}
+
+	return nil
+}
+
+func (vault *vaultClient) DisableAuthBackend(authBackendPath string) error {
+
+	log.Infof("Removing auth backend at path '%s'.", authBackendPath)
+	if err := vault.Client.Sys().DisableAuth(authBackendPath); err != nil {
+		log.Errorf("Failed to disable Auth backend. %v", err)
+		return errors.New("Failed to disable Auth backend")
 	}
 
 	return nil

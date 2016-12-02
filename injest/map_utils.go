@@ -117,7 +117,7 @@ func getBoolFromMap(m *map[string]interface{}, key string, defaultValue bool) (r
 	return result
 }
 
-func getStringMapInterfaceFromMap(m *map[string]interface{}, key string, defaultValue *map[string]interface{}) (*map[string]interface{}) {
+func getStringMapInterfaceFromMap(m *map[string]interface{}, key string, defaultValue *map[string]interface{}) *map[string]interface{} {
 	if m == nil {
 		return defaultValue
 	}

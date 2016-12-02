@@ -89,9 +89,9 @@ func (vault *vaultClient) ReconcilePolicies(oldPolicies *map[string]policyDefini
 	for _, oldPolicy := range *oldPolicies {
 		log.Error("Found runaway policy: " + oldPolicy.Name)
 		if removeDelta {
-			knownDefaultPolicies := map[string]interface{} {
-				"root": nil,
-				"default": nil,
+			knownDefaultPolicies := map[string]interface{}{
+				"root":              nil,
+				"default":           nil,
 				"response-wrapping": nil,
 			}
 			if _, found := knownDefaultPolicies[oldPolicy.Name]; found {

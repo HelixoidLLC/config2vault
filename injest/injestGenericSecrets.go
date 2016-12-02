@@ -16,7 +16,10 @@
 
 package injest
 
-import "config2vault/log"
+import (
+	"config2vault/log"
+	"path/filepath"
+)
 
 func (vault *vaultClient) UpdateGenericSecrets(secrets *[]genericSecret) error {
 	log.Debug("Updating secrets")
@@ -30,6 +33,7 @@ func (vault *vaultClient) UpdateGenericSecrets(secrets *[]genericSecret) error {
 	} else {
 		for _, entry := range *secrets {
 			// Try to remove key path if present
+			entry.Path = filepath.Join("secret", entry.Path)
 			delete(*currentSecrets, entry.Path)
 			err := vault.SetSecret(&entry)
 			if err != nil {
@@ -51,7 +55,7 @@ func (vault *vaultClient) SetSecret(secret *genericSecret) error {
 	for _, kpair := range secret.Fields {
 		data[kpair.Key] = kpair.Value
 	}
-	_, err := vault.Client.Logical().Write("/secret/"+secret.Path, data)
+	_, err := vault.Client.Logical().Write(secret.Path, data)
 	if err != nil {
 		log.Fatalf("Failed to set secret '%s'. %#v", secret.Path, err)
 		return err
@@ -64,7 +68,8 @@ func (vault *vaultClient) SetSecret(secret *genericSecret) error {
 func (vault *vaultClient) ListSecrets() (secretsList *map[string]interface{}, err error) {
 	m := make(map[string]interface{})
 	secretsList = &m
-	err = vault.listSecrets("secret/", secretsList)
+	err = vault.listSecrets("secret", secretsList)
+	log.Debugf("Found list of secrets: %v", *secretsList)
 	return secretsList, err
 }
 
