@@ -62,7 +62,7 @@ func TestInjestAuthAppidBackend(t *testing.T) {
 						Policies: []string{
 							"test_policy",
 						},
-						Role:            roleName,
+						Name:            roleName,
 						SecretIdTtl:     "10m",
 						TokenTtl:        "20m",
 						TokenMaxTtl:     "30m",
@@ -107,7 +107,7 @@ func TestInjestAuthAppidBackend(t *testing.T) {
 				},
 				AppRoles: []appRoleProperties{
 					appRoleProperties{
-						Role:            roleID,
+						Name:            roleID,
 						SecretIdTtl:     "10m",
 						TokenTtl:        "20m",
 						TokenMaxTtl:     "30m",
@@ -137,11 +137,12 @@ func TestInjestAuthAppidBackend(t *testing.T) {
 				},
 				AppRoles: []appRoleProperties{
 					appRoleProperties{
-						Role:            roleID,
+						Name:            roleID,
 						SecretIdTtl:     "20m", // This is the change
 						TokenTtl:        "20m",
 						TokenMaxTtl:     "30m",
-						SecretIdNumUses: 40, Policies: []string{
+						SecretIdNumUses: 40,
+						Policies: []string{
 							"test_policy",
 							"another_policy",
 						},

@@ -93,6 +93,7 @@ func createTestProject(projectPath string, CaFile string, CertFile string, KeyFi
 			time.Sleep(500 * time.Millisecond)
 		}
 		time.Sleep(2 * time.Second)
+		// TODO: this check for vault. Take it out of this block
 		for ok := false; !ok; ok = checkIfHttpAvailable("https://" + connection + ":8200/v1/sys/init") {
 			time.Sleep(500 * time.Millisecond)
 		}

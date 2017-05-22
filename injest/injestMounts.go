@@ -46,11 +46,10 @@ func (vault *vaultClient) UpdateMounts(mounts *[]mountInfo) error {
 			continue
 		}
 
+		// TODO: update mount lease times if were changed since last creation
 		vault.AddMount(&newMount)
 
 		if err := vault.ApplyMountConfig(newMount); err != nil {
-			//panic(fmt.Sprintf("Failed to configure mount: %v", err))
-
 			log.Errorf("Failed to configure new mount. %v", err)
 			log.Info("Unmounting ...")
 			if err := vault.Client.Sys().Unmount(newMount.Path); err != nil {
@@ -67,7 +66,7 @@ func (vault *vaultClient) UpdateMounts(mounts *[]mountInfo) error {
 		"sys":       true,
 		"secret":    true,
 	}
-	for path, _ := range *currentMounts {
+	for path := range *currentMounts {
 		if ignoreMounts[path] {
 			continue
 		}

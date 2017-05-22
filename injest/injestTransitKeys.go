@@ -46,7 +46,7 @@ func (vault *vaultClient) UpdateTransitKey(key *transitKey) error {
 
 	data := make(map[string]interface{})
 	if key.Type != "" {
-		data["type"] = key.Type
+		data["type"] = key.Type  // defaults to: aes256-gcm96
 	}
 
 	if _, err := vault.Client.Logical().Write(path, data); err != nil {

@@ -245,3 +245,7 @@ export DOCKER_HOST=tcp://192.168.99.100:2376  <-- put your docker machine addres
 export DOCKER_CERT_PATH=/Users/your_account_name/.docker/machine/machines/name_of_your_working_docker_machine
 make integration
 ```
+If you're running on Mac and using "Docker for Mac" and not "Docker Toolbox" then you can use:
+```
+export DOCKER_HOST=unix:///var/run/docker.sock
+```

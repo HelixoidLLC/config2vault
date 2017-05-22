@@ -20,6 +20,8 @@ import (
 	"config2vault/log"
 	"errors"
 	"fmt"
+
+	vaultapi "github.com/hashicorp/vault/api"
 )
 
 func (vault *vaultClient) UpdateAuthBackends(authMounts *[]authBackendInfo) error {
@@ -49,6 +51,11 @@ func (vault *vaultClient) UpdateAuthBackends(authMounts *[]authBackendInfo) erro
 		if _, ok := (*currentAuthMounts)[authBackend.Path]; ok {
 
 			// TODO: optimise this
+
+			if err := vault.TuneAuthBackend(&authBackend); err != nil {
+				return err
+			}
+
 			// Reconverge config for the existing mounts
 			if err := vault.ConfigureAuthBackend(&authBackend); err != nil {
 				return err
@@ -62,9 +69,11 @@ func (vault *vaultClient) UpdateAuthBackends(authMounts *[]authBackendInfo) erro
 			continue
 		}
 
-		log.Debug("Here  ####")
-
 		if err := vault.EnableAuthBackend(&authBackend); err != nil {
+			return err
+		}
+
+		if err := vault.TuneAuthBackend(&authBackend); err != nil {
 			return err
 		}
 
@@ -115,6 +124,23 @@ func (vault *vaultClient) EnableAuthBackend(authBackend *authBackendInfo) error 
 	if err := vault.Client.Sys().EnableAuth(authBackend.Path, authBackend.Type, authBackend.Description); err != nil {
 		log.Errorf("Failed to mount a new Auth backend. %v", err)
 		return errors.New("Failed to mount a new Auth backend")
+	}
+
+	return nil
+}
+
+func (vault *vaultClient) TuneAuthBackend(authBackend *authBackendInfo) error {
+	if authBackend.DefaultLeaseTTL != "" || authBackend.MaxLeaseTTL != "" {
+
+		mountConfig := vaultapi.MountConfigInput{
+			DefaultLeaseTTL: authBackend.DefaultLeaseTTL,
+			MaxLeaseTTL: authBackend.MaxLeaseTTL,
+		}
+
+		if err := vault.Client.Sys().TuneMount("auth/" + authBackend.Path, mountConfig); err != nil {
+			log.Errorf("Failed to mount a new Auth backend. %v", err)
+			return errors.New("Failed to mount a new Auth backend")
+		}
 	}
 
 	return nil

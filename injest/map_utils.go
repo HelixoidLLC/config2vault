@@ -159,3 +159,28 @@ func stringArrayToStringMap(in *[]string) *map[string]interface{} {
 	}
 	return &out
 }
+
+func getStringMapFromInterfaceMapInterface(in map[interface{}]interface{}) map[string]string {
+	out := make(map[string]string)
+	for key, value := range in {
+		switch key := key.(type) {
+		case string:
+			switch value := value.(type) {
+			case string:
+				out[key] = value
+			}
+		}
+	}
+	return out
+}
+
+func getStringMapFromStringMapInterface(in map[string]interface{}) map[string]string {
+	out := make(map[string]string)
+	for key, value := range in {
+		switch value := value.(type) {
+		case string:
+			out[key] = value
+		}
+	}
+	return out
+}

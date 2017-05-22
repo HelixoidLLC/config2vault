@@ -26,9 +26,9 @@ import (
 )
 
 func TestInjestTransitKeys(t *testing.T) {
-	//t.Skip("skipping test for now.")
+	t.Skip("skipping test for now.")
 
-	log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.ErrorLevel)
 
 	testEnvPath := "../testing/integration/simple/docker-compose.yml"
 

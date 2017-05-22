@@ -27,7 +27,6 @@ func (vault *vaultClient) UpdateAppRoles(newAppRoles *[]appRoleProperties) error
 	log.Debug("Applying AppRoles")
 	if len(*newAppRoles) == 0 {
 		log.Info("No AppRoles to apply")
-		return nil
 	}
 
 	// TODO: this List fails if the backend is not mounted
@@ -38,7 +37,7 @@ func (vault *vaultClient) UpdateAppRoles(newAppRoles *[]appRoleProperties) error
 
 	for _, newAppRole := range *newAppRoles {
 		needRoleUpdate := true // Will create the role if not found
-		if currentAppRole, ok, err := vault.getCachedAppRole(newAppRole.Role, currentRoles); ok || err != nil {
+		if currentAppRole, ok, err := vault.getCachedAppRole(newAppRole.Name, currentRoles); ok && err == nil {
 			if err != nil {
 				// Error retreiving AppRole
 				return err
@@ -48,7 +47,7 @@ func (vault *vaultClient) UpdateAppRoles(newAppRoles *[]appRoleProperties) error
 				log.Debug("Roles identical. Skipping ...")
 				needRoleUpdate = false
 			} else {
-				log.Warningf("Roles '%s' are NOT identical. Updating ...", currentAppRole.Role)
+				log.Warningf("Roles '%s' are NOT identical. Updating ...", currentAppRole.Name)
 				needRoleUpdate = true
 			}
 		}
@@ -56,6 +55,20 @@ func (vault *vaultClient) UpdateAppRoles(newAppRoles *[]appRoleProperties) error
 			err := vault.SetAppRole(&newAppRole)
 			if err != nil {
 				// Failed to update app role
+				return err
+			}
+		}
+		delete(currentRoles, newAppRole.Name)
+	}
+
+	if len(currentRoles) > 0 {
+		log.Debug("Cleaning old App roles")
+
+		// Runaway roles
+		for oldAppRoleKey, _ := range currentRoles {
+			_, err := vault.DeleteAppRole(oldAppRoleKey)
+			if err != nil {
+				// Failed to delete app role
 				return err
 			}
 		}
@@ -118,10 +131,10 @@ func areEqual(left []string, right []string, ignore []string) bool {
 
 func (vault *vaultClient) ListAppRoles() (roles map[string]*appRoleProperties, err error) {
 	roles = make(map[string]*appRoleProperties)
-	result, err := vault.Client.Logical().List("/auth/approle/role")
+	result, err := vault.Client.Logical().List("auth/approle/role")
 	if err != nil {
-		log.Fatalf("Failed to list app roles. %#v", err)
-		return roles, err
+		log.Errorf("Failed to list app roles. %#v", err)
+		//return roles, err
 	}
 	if result == nil {
 		log.Debugf("No roles found.")
@@ -155,41 +168,59 @@ func (vault *vaultClient) getCachedAppRole(roleKey string, roles map[string]*app
 }
 
 func (vault *vaultClient) SetAppRole(appRole *appRoleProperties) error {
-	data := map[string]interface{}{
-		"secret_id_ttl":      appRole.SecretIdTtl,
-		"token_ttl":          appRole.TokenTtl,
-		"token_max_ttl":      appRole.TokenMaxTtl,
-		"secret_id_num_uses": appRole.SecretIdNumUses,
-		"policies":           strings.Join(appRole.Policies, ","),
+	data := map[string]interface{}{}
+	if appRole.SecretIdTtl != "" {
+		data["secret_id_ttl"] = appRole.SecretIdTtl
 	}
-	_, err := vault.Client.Logical().Write("/auth/approle/role/"+appRole.Role, data)
+	if appRole.TokenTtl != "" {
+		data["token_ttl"] = appRole.TokenTtl
+	}
+	if appRole.TokenMaxTtl != "" {
+		data["token_max_ttl"] = appRole.TokenMaxTtl
+	}
+	data["bind_secret_id"] = appRole.BindSecretId
+	if appRole.Period != "" {
+		data["period"] = appRole.Period
+	}
+	if appRole.BoundCidrList != "" {
+		data["bound_cidr_list"] = appRole.BoundCidrList
+	}
+	if appRole.SecretIdNumUses > 0 {
+		data["secret_id_num_uses"] = appRole.SecretIdNumUses
+	}
+	if len(appRole.Policies) > 0 {
+		data["policies"] = strings.Join(appRole.Policies, ",")
+	}
+
+	_, err := vault.Client.Logical().Write("auth/approle/role/"+appRole.Name, data)
 	if err != nil {
-		log.Fatalf("Failed to create app role '%s'. %#v", appRole.Role, err)
+		log.Fatalf("Failed to create app role '%s'. %#v", appRole.Name, err)
 		return err
 	}
-	info, err := vault.Client.Logical().Read("/auth/approle/role/" + appRole.Role + "/role-id")
+	info, err := vault.Client.Logical().Read("auth/approle/role/" + appRole.Name + "/role-id")
 	roleID := ""
 	if info != nil && info.Data != nil {
 		roleID = getStringFromMap(&info.Data, "role_id", "")
 	}
-	log.Infof("Created/Updated app role '%s' with RoleID: %s", appRole.Role, roleID)
+	log.Infof("Created/Updated app role '%s' with RoleID: %s", appRole.Name, roleID)
 
 	return nil
 }
 
 func (vault *vaultClient) GetAppRole(roleKey string) (*appRoleProperties, error) {
 	log.Debugf("Retreiving policy for role '%s'", roleKey)
-	role, err := vault.Client.Logical().Read("/auth/approle/role/" + roleKey)
+	role, err := vault.Client.Logical().Read("auth/approle/role/" + roleKey)
 	if err != nil {
-		log.Fatalf("Failed to ready App Role '%s'", roleKey)
+		log.Errorf("Failed to read App Role '%s'. %#v", roleKey, err)
 		return nil, err
 	}
-	log.Debugf("Role: %#v", role)
 	if role == nil {
 		return nil, nil
 	}
+	log.Debugf("Role: %#v", *role)
 
 	roleData := appRoleProperties{
+		Name:            roleKey,
 		SecretIdNumUses: getIntFromMap(&role.Data, "secret_id_num_uses", -1),
 		SecretIdTtl:     getStringFromMap(&role.Data, "secret_id_ttl", "-1"),
 		TokenMaxTtl:     getStringFromMap(&role.Data, "token_max_ttl", "-1"),
@@ -205,7 +236,7 @@ func (vault *vaultClient) GetAppRole(roleKey string) (*appRoleProperties, error)
 
 func (vault *vaultClient) GetAppRoleID(roleKey string) (string, error) {
 
-	info, err := vault.Client.Logical().Read("/auth/approle/role/" + roleKey + "/role-id")
+	info, err := vault.Client.Logical().Read("auth/approle/role/" + roleKey + "/role-id")
 	if err != nil {
 		log.Error("Failed to get RoleID for Role: " + roleKey)
 		return "", err
@@ -219,8 +250,18 @@ func (vault *vaultClient) GetAppRoleID(roleKey string) (string, error) {
 	return roleID, nil
 }
 
+func (vault *vaultClient) DeleteAppRole(roleKey string) (bool, error) {
+	log.Debugf("Deleting app role: %s", roleKey)
+	_, err := vault.Client.Logical().Delete("auth/approle/role/" + roleKey)
+	if err != nil {
+		log.Error("Failed to get RoleID for Role: " + roleKey)
+		return false, err
+	}
+	return true, nil
+}
+
 func (vault *vaultClient) GetAppRoleSecretID(roleKey string) (string, error) {
-	secret, err := vault.Client.Logical().Write("/auth/approle/role/"+roleKey+"/secret-id", map[string]interface{}{})
+	secret, err := vault.Client.Logical().Write("auth/approle/role/"+roleKey+"/secret-id", map[string]interface{}{})
 	if err != nil {
 		log.Error("Failed to get SecretID for Role: " + roleKey)
 		return "", err
@@ -234,7 +275,7 @@ func (vault *vaultClient) LoginAppRole(roleID string, secretID string) (*vaultap
 		"role_id":   roleID,
 		"secret_id": secretID,
 	}
-	secret, err := vault.Client.Logical().Write("/auth/approle/login", data)
+	secret, err := vault.Client.Logical().Write("auth/approle/login", data)
 	if err != nil {
 		log.Error("Failed to Login with RoleID: " + roleID)
 		return nil, err
@@ -242,3 +283,4 @@ func (vault *vaultClient) LoginAppRole(roleID string, secretID string) (*vaultap
 	log.Infof("Login info: %#v", secret.Auth)
 	return secret.Auth, nil
 }
+

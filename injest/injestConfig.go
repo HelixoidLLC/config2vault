@@ -32,6 +32,7 @@ import (
 	"github.com/hashicorp/go-cleanhttp"
 	vaultapi "github.com/hashicorp/vault/api"
 	"gopkg.in/yaml.v2"
+	"os/user"
 )
 
 type vaultClient struct {
@@ -40,23 +41,26 @@ type vaultClient struct {
 }
 
 type mountInfo struct {
-	Type               string                   `yaml:"type"`
-	Description        string                   `yaml:"description,omitempty"`
-	Path               string                   `yaml:"path,omitempty"`
-	DefaultLeaseTTL    string                   `yaml:"default_lease_ttl,omitempty"`
-	MaxLeaseTTL        string                   `yaml:"max_lease_ttl,omitempty"`
-	PolicyBase64Encode bool                     `yaml:"policy_base64_encode,omitempty"`
-	Config             []map[string]interface{} `yaml:"config,omitempty"`
+	Type               string `yaml:"type"`
+	Description        string `yaml:"description,omitempty"`
+	Path               string `yaml:"path,omitempty"`
+	DefaultLeaseTTL    string `yaml:"default_lease_ttl,omitempty"`
+	MaxLeaseTTL        string `yaml:"max_lease_ttl,omitempty"`
+	PolicyBase64Encode bool   `yaml:"policy_base64_encode,omitempty"`
+	//ForceNoCache       bool                     `yaml:"force_no_cache,omitempty"`
+	Config []map[string]interface{} `yaml:"config,omitempty"`
 }
 
 type propertyBag map[string]interface{}
 type propertyBagArray []propertyBag
 
 type authBackendInfo struct {
-	Type        string                   `yaml:"type"`
-	Description string                   `yaml:"description,omitempty"`
-	Path        string                   `yaml:"path"`
-	Config      []map[string]interface{} `yaml:"config,omitempty"`
+	Type            string                   `yaml:"type"`
+	Description     string                   `yaml:"description,omitempty"`
+	Path            string                   `yaml:"path"`
+	DefaultLeaseTTL string                   `yaml:"default_lease_ttl,omitempty"`
+	MaxLeaseTTL     string                   `yaml:"max_lease_ttl,omitempty"`
+	Config          []map[string]interface{} `yaml:"config,omitempty"`
 }
 
 type rolePolicy struct {
@@ -79,7 +83,7 @@ type policyDefiniton struct {
 }
 
 type appRoleProperties struct {
-	Role            string   `yaml:"role"`
+	Name            string   `yaml:"name"`
 	Policies        []string `yaml:"policies,omitempty"`
 	SecretIdTtl     string   `yaml:"secret_id_ttl,omitempty"`
 	TokenTtl        string   `yaml:"token_ttl,omitempty"`
@@ -101,7 +105,7 @@ type genericSecret struct {
 }
 
 type transitKey struct {
-	Type string `yaml:"type"`
+	Type string `yaml:"type,omitempty"`
 	Name string `yaml:"name"`
 	// derived
 	// convergent_encryption
@@ -180,6 +184,7 @@ func (masterConfig *vaultConfig) mergeConfig(newConfig *vaultConfig) {
 	(*masterConfig).Policies = append(masterConfig.Policies, newConfig.Policies...)
 	(*masterConfig).AppRoles = append(masterConfig.AppRoles, newConfig.AppRoles...)
 	(*masterConfig).Secrets = append(masterConfig.Secrets, newConfig.Secrets...)
+	(*masterConfig).TransitKeys = append(masterConfig.TransitKeys, newConfig.TransitKeys...)
 }
 
 func injestConfig(vault *vaultClient, conf *vaultConfig) error {
@@ -207,28 +212,9 @@ func injestConfig(vault *vaultClient, conf *vaultConfig) error {
 		return errors.New("Failed to reconcile new and existing policies")
 	}
 
-	// ###   Roles
-	log.Debug("Applying roles")
-	existingRoles := map[string][]string{}
-	// TODO: remove "runaway" mounts
-	for _, mount := range conf.Mounts {
-		roles, _ := vault.ListRoles(mount)
-		log.Infof("Detected existing roles at '%s': %v", mount.Path, roles)
-		existingRoles[mount.Path] = roles
-	}
-
-	if vault.ApplyRoles(mountMap, conf.Roles, &existingRoles) != nil {
+	// ### Roles
+	if vault.ApplyRolesToMounts(&mountMap, &conf.Roles) != nil {
 		return errors.New("Failed to apply roles")
-	}
-
-	for mount, roles := range existingRoles {
-		if len(roles) > 0 {
-			log.Warningf("For mount '%s' found runaway roles %v. Deleting ...", mount, roles)
-			if err := vault.DeleteRoles(mount, roles); err != nil {
-				log.Error("Failed to delete runaway roles from mount " + mount)
-				return err
-			}
-		}
 	}
 
 	// ###   Users
@@ -255,7 +241,7 @@ func injestConfig(vault *vaultClient, conf *vaultConfig) error {
 }
 
 func ReadConfigFile(filePath string) (*vaultConfig, error) {
-	config := vaultConfig{}
+	cfg := vaultConfig{}
 
 	filename, _ := filepath.Abs(filePath)
 	yamlFile, err := ioutil.ReadFile(filename)
@@ -263,15 +249,15 @@ func ReadConfigFile(filePath string) (*vaultConfig, error) {
 		log.Fatal(err)
 	}
 
-	err = yaml.Unmarshal(yamlFile, &config)
+	err = yaml.Unmarshal(yamlFile, &cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return &config, nil
+	return &cfg, nil
 }
 
-func GetConentEvenIfFile(policy string) (string, error) {
+func GetContentEvenIfFile(policy string) (string, error) {
 	if policy == "" {
 		return "", nil
 	}
@@ -280,7 +266,7 @@ func GetConentEvenIfFile(policy string) (string, error) {
 	}
 
 	// If the property content starts from a character @ - treat it as a file name and read the content from the file
-	policyPath := string(policy[1:len(policy)])
+	policyPath := string(policy[1:])
 	filename, _ := filepath.Abs(policyPath)
 	log.Infof("Loading content from file %s", filename)
 
@@ -291,21 +277,6 @@ func GetConentEvenIfFile(policy string) (string, error) {
 	}
 
 	return string(policyBody), nil
-}
-
-func GetStringMap(in map[interface{}]interface{}) map[string]string {
-	log.Debug("GetStringMap")
-	out := make(map[string]string)
-	for key, value := range in {
-		switch key := key.(type) {
-		case string:
-			switch value := value.(type) {
-			case string:
-				out[key] = value
-			}
-		}
-	}
-	return out
 }
 
 func (vault *vaultClient) ApplyMountConfig(mount mountInfo) error {
@@ -334,11 +305,11 @@ func (vault *vaultClient) ApplyMountConfig(mount mountInfo) error {
 					log.Error("Can't parse ca_bundle. Skipping ...")
 					continue
 				}
-				ca_bundle = GetStringMap(ca_bundle_ii)
+				ca_bundle = getStringMapFromInterfaceMapInterface(ca_bundle_ii)
 			}
-			key, _ := GetConentEvenIfFile(ca_bundle["key"])
+			key, _ := GetContentEvenIfFile(ca_bundle["key"])
 			key = strings.TrimRight(key, "\n")
-			cert, _ := GetConentEvenIfFile(ca_bundle["cert"])
+			cert, _ := GetContentEvenIfFile(ca_bundle["cert"])
 			cert = strings.TrimRight(cert, "\n")
 			data["pem_bundle"] = cert + "\n" + key
 		} else if properties, ok := cfg["properties"]; ok {
@@ -376,6 +347,19 @@ func Reconnect() (*vaultClient, error) {
 	if token == "" {
 		vault.Token = os.Getenv("VAULT_TOKEN")
 	}
+	if token == "" {
+		log.Debug("No token provided. Loading default one from ~/.vault-token")
+
+		usr, _ := user.Current()
+		dir := usr.HomeDir
+		path := filepath.Join(dir, ".vault-token")
+		tmp_token, err := ioutil.ReadFile(path)
+		if err != nil {
+			return nil, errors.New("Failed to load token from " + path)
+		}
+		token = string(tmp_token)
+	}
+	log.Debugf("Vault token: %s", token)
 
 	// TODO: check all the ENV vars
 	// VAULT_CACERT
@@ -389,16 +373,21 @@ func Reconnect() (*vaultClient, error) {
 		log.Fatal(err)
 		return nil, errors.New("Can't locate CA file")
 	}
+	log.Debugf("Loading CA certificate from: %s", ca_file_path)
+
 	vault_cert_path, err := filepath.Abs(config.Conf.CertFile)
 	if err != nil {
 		log.Fatal(err)
 		return nil, errors.New("Can't locate Vault Cert file")
 	}
+	log.Debugf("Loading client certificate from: %s", ca_file_path)
+
 	vault_key_path, err := filepath.Abs(config.Conf.KeyFile)
 	if err != nil {
 		log.Fatal(err)
 		return nil, errors.New("Can't locate Vault Key file")
 	}
+	log.Debugf("Loading client certificate key from: %s", ca_file_path)
 
 	_vaultClient, err := createClient(address, ca_file_path, vault_cert_path, vault_key_path)
 	if err == nil {
@@ -420,20 +409,20 @@ func Reconnect() (*vaultClient, error) {
 }
 
 func createClient(address string, CaFile string, CertFile string, KeyFile string) (*vaultapi.Client, error) {
-	config := vaultapi.DefaultConfig()
-	config.Address = address
+	cfg := vaultapi.DefaultConfig()
+	cfg.Address = address
 
 	u, err := url.Parse(address)
 	if err != nil {
 		return nil, err
 	}
 	if u.Scheme == "https" {
-		config.HttpClient.Transport = createTlsTransport(CaFile, CertFile, KeyFile)
+		cfg.HttpClient.Transport = createTlsTransport(CaFile, CertFile, KeyFile)
 	} else {
 		log.Debug("Created non-TLS client")
 	}
 
-	client, err := vaultapi.NewClient(config)
+	client, err := vaultapi.NewClient(cfg)
 
 	return client, err
 }

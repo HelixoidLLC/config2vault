@@ -49,11 +49,11 @@ func TestInjestMounts(t *testing.T) {
 			unexpectedPath := "ssh_unexpected"
 			policies := vaultConfig{
 				Mounts: []mountInfo{
-					mountInfo{
+					{
 						Type: mountType,
 						Path: expectedPath,
 					},
-					mountInfo{
+					{
 						Type: mountType,
 						Path: unexpectedPath,
 					},
@@ -73,7 +73,7 @@ func TestInjestMounts(t *testing.T) {
 
 			policiesNew := vaultConfig{
 				Mounts: []mountInfo{
-					mountInfo{
+					{
 						Type: mountType,
 						Path: expectedPath,
 					},
@@ -98,11 +98,11 @@ func TestInjestMounts(t *testing.T) {
 			ignoredPath := "ssh_unexpected"
 			policies := vaultConfig{
 				Mounts: []mountInfo{
-					mountInfo{
+					{
 						Type: mountType,
 						Path: expectedPath,
 					},
-					mountInfo{
+					{
 						Type: mountType,
 						Path: ignoredPath,
 					},
@@ -122,11 +122,11 @@ func TestInjestMounts(t *testing.T) {
 
 			policiesNew := vaultConfig{
 				Mounts: []mountInfo{
-					mountInfo{
+					{
 						Type: mountType,
 						Path: expectedPath,
 					},
-					mountInfo{
+					{
 						Type: "${ignore}",
 						Path: ignoredPath,
 					},
