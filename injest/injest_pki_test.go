@@ -28,7 +28,7 @@ import (
 )
 
 func TestInjestPkiBackend(t *testing.T) {
-	//t.Skip("skipping test for now.")
+	t.Skip("skipping test for now.")
 
 	log.SetLevel(log.ErrorLevel)
 
@@ -242,7 +242,7 @@ func TestInjestPkiBackend(t *testing.T) {
 
 			data := map[string]interface{}{
 				"common_name": "intermediate.com",
-				"ip_sans": "127.0.0.1",
+				"ip_sans":     "127.0.0.1",
 			}
 			secret, err := vault.Client.Logical().Write("/pki-intermediate/intermediate/generate/exported", data)
 			if err != nil {
@@ -254,7 +254,7 @@ func TestInjestPkiBackend(t *testing.T) {
 
 			data = map[string]interface{}{
 				"common_name": "intermediate.com",
-				"csr": csr,
+				"csr":         csr,
 			}
 			secret, err = vault.Client.Logical().Write("/pki-root/root/sign-intermediate", data)
 			if err != nil {
@@ -291,6 +291,114 @@ func TestInjestPkiBackend(t *testing.T) {
 			So(commonName, ShouldEqual, "blah.example.com")
 			issuer := pub.Issuer.CommonName
 			So(issuer, ShouldEqual, "intermediate.com")
+		})
+		Convey("Generate signing cert", func() {
+			mountType := "pki"
+			mountPath := "pki-intermediate"
+			mountDescr := "PKI intermediate"
+			policies := vaultConfig{
+				Mounts: []mountInfo{
+					{
+						Path:        "pki-root",
+						Type:        mountType,
+						Description: "PKI root",
+						MaxLeaseTTL: "87600h",
+						Config: []map[string]interface{}{
+							{
+								"path": "ca",
+								"ca_bundle": map[string]string{
+									"key":  "@" + filepath.Join(testEnvDir, "ssl/ca.key"),
+									"cert": "@" + filepath.Join(testEnvDir, "ssl/ca.crt"),
+								},
+							},
+						},
+					},
+					{
+						Path:        mountPath,
+						Type:        mountType,
+						Description: mountDescr,
+						MaxLeaseTTL: "87600h",
+					},
+				},
+				Roles: []rolePolicy{
+					{
+						Name: "sign-cert",
+						Path: mountPath,
+						Properties: map[string]string{
+							//"allowed_domains":     "sign",
+							"allow_bare_domains": "true",
+							//"organization ":       "Some Organization",
+							//"ou":                  "Another Team",
+							"server_flag":         "false",
+							"client_flag":         "false",
+							"allow_ip_sans":       "false",
+							"enforce_hostnames":   "false",
+							"allow_any_name":      "true",
+							"code_signing_flag":   "true",
+							"key_bits":            "4096",
+							"use_csr_common_name": "false",
+							"key_usage":           "DigitalSignature",
+							"max_ttl":             "8h",
+							"no_store":            "true",
+						},
+					},
+				},
+			}
+			err := injestConfig(vault, &policies)
+			So(err, ShouldBeEmpty)
+
+			data := map[string]interface{}{
+				"common_name": "intermediate.com",
+				"ip_sans":     "127.0.0.1",
+			}
+			secret, err := vault.Client.Logical().Write("/pki-intermediate/intermediate/generate/exported", data)
+			if err != nil {
+				t.Fatalf("Failed to get csr. %#v", err)
+			}
+			log.Infof("Got secret: %#v", *secret)
+			csr := getStringFromMap(&secret.Data, "csr", "")
+			So(csr, ShouldNotBeBlank)
+
+			data = map[string]interface{}{
+				"common_name": "intermediate.com",
+				"csr":         csr,
+			}
+			secret, err = vault.Client.Logical().Write("/pki-root/root/sign-intermediate", data)
+			if err != nil {
+				t.Fatalf("Failed to issue a signed certificate. %#v", err)
+			}
+			log.Infof("Got secret: %#v", *secret)
+			certificate := getStringFromMap(&secret.Data, "certificate", "")
+			So(certificate, ShouldNotBeBlank)
+
+			data = map[string]interface{}{
+				"certificate": certificate,
+			}
+			secret, err = vault.Client.Logical().Write("/pki-intermediate/intermediate/set-signed", data)
+			if err != nil {
+				t.Fatalf("Failed to set an intermediate signed certificate. %#v", err)
+			}
+			So(secret, ShouldBeNil)
+
+			data = map[string]interface{}{
+				"common_name":          "sign",
+				"exclude_cn_from_sans": "true",
+			}
+			secret, err = vault.Client.Logical().Write("/pki-intermediate/issue/sign-cert", data)
+			if err != nil {
+				t.Fatalf("Failed to issue a certificate. %#v", err)
+			}
+			log.Infof("Got secret: %#v", *secret)
+
+			cert := getStringFromMap(&secret.Data, "certificate", "")
+			pubKey, _ := pem.Decode([]byte(cert))
+			pub, _ := x509.ParseCertificate(pubKey.Bytes)
+
+			So(pub, ShouldNotBeNil)
+			commonName := pub.Subject.CommonName
+			So(commonName, ShouldEqual, "sign")
+			So(pub.KeyUsage, ShouldEqual, x509.KeyUsageDigitalSignature)
+			So(pub.ExtKeyUsage, ShouldContain, x509.ExtKeyUsageCodeSigning)
 		})
 	})
 }
