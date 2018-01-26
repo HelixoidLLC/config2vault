@@ -39,9 +39,11 @@ type Config struct {
 var Conf Config
 
 var configPath string
+var vaultAdminToken string
 
 func init() {
 	flag.StringVar(&configPath, "config", "./config.json", "path to the config file")
+	flag.StringVar(&vaultAdminToken, "token", "", "Vault admin token")
 }
 
 func ReadConfig() error {
@@ -53,6 +55,9 @@ func ReadConfig() error {
 	err = json.Unmarshal(configFile, &Conf)
 	if err != nil {
 		log.Errorf("Failed to load config file: %v", err)
+	}
+	if (vaultAdminToken != "") {
+	    Conf.Token = vaultAdminToken
 	}
 
 	return nil

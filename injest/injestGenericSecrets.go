@@ -85,8 +85,13 @@ func (vault *vaultClient) listSecrets(path string, result *map[string]interface{
 		return nil
 	}
 	keys := getStringArrayFromMap(&list.Data, "keys", []string{})
+	log.Debugf("Found %v secrets", keys)
 	for _, k := range keys {
-		fullSecretPath := path + k
+		separator := ""
+		if path[len(path)-1:] != "/" {
+			separator = "/"
+		}
+		fullSecretPath := path + separator + k
 		log.Debug("Secret path: " + fullSecretPath)
 		if k[len(k)-1] == '/' {
 			vault.listSecrets(fullSecretPath, result)
